@@ -2,6 +2,11 @@
 include 'db_connect.php';
 session_start();
 
+// Cek koneksi database
+if (!$conn) {
+  die("Koneksi database gagal: " . mysqli_connect_error());
+}
+
 // Inisialisasi keranjang
 if (!isset($_SESSION['cart'])) {
   $_SESSION['cart'] = [];
@@ -9,8 +14,8 @@ if (!isset($_SESSION['cart'])) {
 
 // Tambah ke keranjang
 if (isset($_GET['add'])) {
-  $id = $_GET['add'];
-  if (!in_array($id, $_SESSION['cart'])) {
+  $id = (int) $_GET['add']; // pastikan integer
+  if ($id > 0 && !in_array($id, $_SESSION['cart'])) {
     $_SESSION['cart'][] = $id;
   }
   header("Location: index.php");
@@ -18,13 +23,14 @@ if (isset($_GET['add'])) {
 }
 
 // Pencarian produk
-$search = "";
-if (isset($_GET['cari'])) {
-  $search = $_GET['cari'];
-}
+$search = trim($_GET['cari'] ?? '');
+$searchTerm = "%{$search}%";
 
-$query = "SELECT * FROM produk WHERE nama_produk LIKE '%$search%'";
-$result = mysqli_query($conn, $query);
+// Query aman pakai prepared statement
+$stmt = $conn->prepare("SELECT * FROM produk WHERE nama_produk LIKE ? LIMIT 20");
+$stmt->bind_param("s", $searchTerm);
+$stmt->execute();
+$result = $stmt->get_result();
 ?>
 
 <!DOCTYPE html>
@@ -33,14 +39,10 @@ $result = mysqli_query($conn, $query);
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rasper Fashion Store</title>
+  <link rel="icon" type="image/png" href="img/logo.png">
 
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background-color: #f5f7fa;
       color: #333;
@@ -48,7 +50,7 @@ $result = mysqli_query($conn, $query);
       line-height: 1.6;
     }
 
-    /* ================= HEADER ================= */
+    /* ===== HEADER ===== */
     header {
       display: flex;
       justify-content: space-between;
@@ -58,14 +60,11 @@ $result = mysqli_query($conn, $query);
       color: white;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
     }
-
-    /* Bagian logo + nama toko */
     .logo-area {
       display: flex;
       align-items: center;
       gap: 12px;
     }
-
     .logo-area img {
       height: 40px;
       width: auto;
@@ -74,13 +73,11 @@ $result = mysqli_query($conn, $query);
       padding: 4px;
       box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
     }
-
     header h1 {
       font-size: 22px;
       font-weight: 600;
       letter-spacing: 0.5px;
     }
-
     header a {
       color: #fff;
       text-decoration: none;
@@ -88,11 +85,9 @@ $result = mysqli_query($conn, $query);
       margin-left: 15px;
       transition: color 0.3s ease;
     }
-    header a:hover {
-      color: #00bfff;
-    }
+    header a:hover { color: #00bfff; }
 
-    /* ================= SEARCH BAR ================= */
+    /* ===== SEARCH ===== */
     .search-bar {
       text-align: center;
       margin: 40px 0 25px;
@@ -128,7 +123,7 @@ $result = mysqli_query($conn, $query);
       transform: scale(1.05);
     }
 
-    /* ================= PRODUK GRID ================= */
+    /* ===== PRODUK GRID ===== */
     .produk-container {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -136,7 +131,7 @@ $result = mysqli_query($conn, $query);
       padding: 20px 60px 60px;
     }
 
-    /* ================= PRODUK CARD ================= */
+    /* ===== PRODUK CARD ===== */
     .produk-card {
       background: #fff;
       border-radius: 12px;
@@ -189,7 +184,7 @@ $result = mysqli_query($conn, $query);
       transform: scale(1.05);
     }
 
-    /* ================= FOOTER ================= */
+    /* ===== FOOTER ===== */
     footer {
       text-align: center;
       padding: 18px;
@@ -200,20 +195,11 @@ $result = mysqli_query($conn, $query);
       letter-spacing: 0.3px;
     }
 
-    /* ================= RESPONSIVE ================= */
+    /* ===== RESPONSIVE ===== */
     @media (max-width: 768px) {
-      header {
-        flex-direction: column;
-        gap: 10px;
-        text-align: center;
-        padding: 20px;
-      }
-      .search-bar input[type='text'] {
-        width: 220px;
-      }
-      .produk-container {
-        padding: 20px;
-      }
+      header { flex-direction: column; gap: 10px; text-align: center; padding: 20px; }
+      .search-bar input[type='text'] { width: 220px; }
+      .produk-container { padding: 20px; }
     }
   </style>
 </head>
@@ -233,7 +219,8 @@ $result = mysqli_query($conn, $query);
 
 <div class="search-bar">
   <form method="get">
-    <input type="text" name="cari" placeholder="Cari produk fashion..." value="<?= htmlspecialchars($search); ?>">
+    <input type="text" name="cari" placeholder="Cari produk fashion..." 
+           value="<?= htmlspecialchars($search); ?>">
     <button type="submit">Cari</button>
   </form>
 </div>
@@ -254,7 +241,7 @@ if ($result && mysqli_num_rows($result) > 0) {
   }
 }
 
-// Produk contoh (dummy)
+// Produk dummy tambahan (offline)
 $dummy_produk = [
   ["nama" => "Kaos Polos Premium", "harga" => 95000, "stok" => 25, "gambar" => "img/kaos.jpg"],
   ["nama" => "Hoodie Oversize", "harga" => 185000, "stok" => 15, "gambar" => "img/hoodie.jpg"],
@@ -280,19 +267,29 @@ if (count($all_produk) > 0) {
 
     echo "
     <div class='produk-card'>
-      <img src='$img' alt='$nama'>
+      <img src='$img' alt='$nama' onerror=\"this.src='img/default.jpg'\">
       <div class='produk-info'>
         <h3>$nama</h3>
         <p class='harga'>Rp $harga</p>
-        <p class='stok'>Stok: $stok</p>
-        <a href='?add=" . ($p['id'] ?? 0) . "' class='btn-keranjang'>Tambah ke Keranjang</a>
-      </div>
-    </div>";
+        <p class='stok'>Stok: $stok</p>";
+    
+    // Tampilkan tombol hanya untuk produk dari database
+    if (isset($p['id']) && $p['id'] > 0) {
+      echo "<a href='?add=" . $p['id'] . "' class='btn-keranjang'>Tambah ke Keranjang</a>";
+    }
+
+    echo "</div></div>";
   }
 } else {
   echo "<p style='grid-column:1 / -1; text-align:center;'>Produk tidak ditemukan.</p>";
 }
 ?>
+</div>
+
+<div style="text-align:center; margin:40px;">
+  <a href="keranjang.php" class="btn-keranjang" style="padding:12px 24px; font-size:16px;">
+    Lihat Keranjang 🛒
+  </a>
 </div>
 
 <footer>
