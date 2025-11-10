@@ -7,6 +7,20 @@ if (!$conn) {
   die("Koneksi database gagal: " . mysqli_connect_error());
 }
 
+// Jika user belum login → arahkan ke halaman login
+if (!isset($_SESSION['username'])) {
+  header("Location: user_login.php");
+  exit;
+}
+
+// Tombol Logout ditekan
+if (isset($_GET['logout'])) {
+  session_unset();
+  session_destroy();
+  header("Location: user_login.php");
+  exit;
+}
+
 // Inisialisasi keranjang
 if (!isset($_SESSION['cart'])) {
   $_SESSION['cart'] = [];
@@ -86,6 +100,12 @@ $result = $stmt->get_result();
       transition: color 0.3s ease;
     }
     header a:hover { color: #00bfff; }
+
+    .user-nav {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
 
     /* ===== SEARCH ===== */
     .search-bar {
@@ -211,9 +231,11 @@ $result = $stmt->get_result();
     <img src="img/logo.png" alt="Logo Rasper">
     <h1>Rasper Fashion Store</h1>
   </div>
-  <div>
-    <a href="admin_login.php">Admin</a> |
+
+  <div class="user-nav">
+    <span>👤 <?= htmlspecialchars($_SESSION['username']); ?></span>
     <a href="keranjang.php">🛒 Keranjang (<?= count($_SESSION['cart']); ?>)</a>
+    <a href="?logout=true" style="color: #ff6666;">Logout</a>
   </div>
 </header>
 
@@ -273,7 +295,6 @@ if (count($all_produk) > 0) {
         <p class='harga'>Rp $harga</p>
         <p class='stok'>Stok: $stok</p>";
     
-    // Tampilkan tombol hanya untuk produk dari database
     if (isset($p['id']) && $p['id'] > 0) {
       echo "<a href='?add=" . $p['id'] . "' class='btn-keranjang'>Tambah ke Keranjang</a>";
     }
